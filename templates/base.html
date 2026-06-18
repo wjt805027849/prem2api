@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>prem2api - {% block title %}Dashboard{% endblock %}</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<style>
+body { background: #f5f7fb; font-size: .9rem; }
+.sidebar { background: #1a1d23; min-height: 100vh; }
+.sidebar .nav-link { color: #8b8fa3; padding: .6rem 1rem; border-radius: .5rem; margin: .1rem 0; }
+.sidebar .nav-link:hover, .sidebar .nav-link.active { color: #fff; background: #2a2d35; }
+.sidebar .nav-link i { margin-right: .5rem; }
+.stat-card { border: none; border-radius: 1rem; }
+.stat-card .card-body { padding: 1.2rem; }
+.stat-value { font-size: 1.8rem; font-weight: 700; }
+.stat-label { color: #6c757d; font-size: .8rem; }
+.table-container { background: #fff; border-radius: 1rem; padding: 1.5rem; }
+.table th { border-top: none; color: #6c757d; font-weight: 500; font-size: .8rem; }
+.table td { vertical-align: middle; }
+.badge-200 { background: #d1fae5; color: #065f46; }
+.badge-400, .badge-429, .badge-500 { background: #fee2e2; color: #991b1b; }
+.pagination { margin-bottom: 0; }
+.btn-sm { font-size: .8rem; }
+.lang-btn { cursor: pointer; padding: .25rem .6rem; border-radius: .3rem; border: 1px solid #dee2e6; background: #fff; font-size: .8rem; }
+.lang-btn:hover { background: #e9ecef; }
+</style>
+</head>
+<body>
+<div class="container-fluid">
+<div class="row">
+  <!-- Sidebar -->
+  <div class="col-md-2 sidebar p-3 d-none d-md-block">
+    <div class="text-white fs-5 fw-bold mb-4 mt-2">
+      <i class="bi bi-shield-shaded"></i> prem2api
+    </div>
+    <nav class="nav flex-column">
+      <a class="nav-link {% if request.path == '/admin' %}active{% endif %}" href="/admin" data-i18n="nav_dashboard">
+        <i class="bi bi-speedometer2"></i> Dashboard
+      </a>
+      <a class="nav-link {% if '/keys' in request.path %}active{% endif %}" href="/admin/keys" data-i18n="nav_keys">
+        <i class="bi bi-key"></i> Keys
+      </a>
+      <a class="nav-link {% if '/logs' in request.path %}active{% endif %}" href="/admin/logs" data-i18n="nav_logs">
+        <i class="bi bi-list-ul"></i> Logs
+      </a>
+      <a class="nav-link {% if '/channels' in request.path %}active{% endif %}" href="/admin/channels" data-i18n="nav_channels">
+        <i class="bi bi-diagram-3"></i> Channels
+      </a>
+    </nav>
+  </div>
+
+  <!-- Main -->
+  <div class="col-md-10 ms-auto p-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4 class="mb-0">{% block heading %}Dashboard{% endblock %}</h4>
+      <button class="lang-btn" onclick="toggleLang()" id="langBtn">EN</button>
+    </div>
+    {% block content %}{% endblock %}
+  </div>
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const I18N = {
+  zh: {
+    nav_dashboard: '仪表盘',
+    nav_keys: 'Key 管理',
+    nav_logs: '请求日志',
+    nav_channels: '通道状态',
+    // dashboard
+    d_title: '仪表盘',
+    total_requests: '总请求',
+    success: '成功',
+    failed: '失败',
+    avg_ttft: '首 Token 延迟',
+    avg_latency: '总耗时',
+    prompt_tokens: '输入 Token',
+    completion_tokens: '输出 Token',
+    prompt_col: '输入',
+    completion_col: '输出',
+    token_chart: 'Token 用量 (近24h)',
+    by_model: '按模型',
+    channel_health: '通道健康',
+    no_data: '暂无数据',
+    alive: '可用',
+    total: '总数',
+    // keys
+    k_title: 'Key 管理',
+    import_keys: '导入 Key',
+    paste_keys: '粘贴 Key（每行一个）',
+    label_opt: '标签（可选）',
+    import_btn: '导入',
+    imported_keys: '已导入 Key',
+    no_keys: '暂无 Key',
+    key_col: 'Key',
+    label_col: '标签',
+    status_col: '状态',
+    status_ok: '可用',
+    status_unknown: '未检测',
+    active: '启用',
+    disabled: '停用',
+    dead_col: '已失效',
+    pool_keys: 'Key 池',
+    check_all: '批量检测',
+    tab_paste: '粘贴',
+    tab_file: '文件',
+    file_select: '选择 .txt 文件',
+    drag_hint: '拖入 .txt 文件到此处',
+    // logs
+    l_title: '请求日志',
+    all_models: '所有模型',
+    all_status: '所有状态',
+    refresh: '刷新',
+    no_logs: '暂无日志',
+    time_col: '时间',
+    model_col: '模型',
+    channel_col: '通道',
+    status_col2: '状态',
+    ttft_col: '首 Token',
+    latency_col: '总耗时',
+    ip_col: 'IP',
+    // channels
+    c_title: '通道状态',
+    // stats cards
+    st_requests: '请求',
+    st_alive: '可用',
+    st_dead: '已失效',
+    models_label: '模型',
+  },
+  en: {
+    nav_dashboard: 'Dashboard',
+    nav_keys: 'Keys',
+    nav_logs: 'Logs',
+    nav_channels: 'Channels',
+    d_title: 'Dashboard',
+    total_requests: 'Total Requests',
+    success: 'Success',
+    failed: 'Failed',
+    avg_ttft: 'TTFT',
+    avg_latency: 'Total Latency',
+    prompt_tokens: 'Prompt Tokens',
+    completion_tokens: 'Completion Tokens',
+    prompt_col: 'Prompt',
+    completion_col: 'Completion',
+    token_chart: 'Token Usage (last 24h)',
+    by_model: 'By Model',
+    channel_health: 'Channel Health',
+    no_data: 'No data yet',
+    alive: 'Alive',
+    total: 'Total',
+    k_title: 'Key Management',
+    import_keys: 'Import Keys',
+    paste_keys: 'Paste keys (one per line)',
+    label_opt: 'Label (optional)',
+    import_btn: 'Import',
+    imported_keys: 'Pool Keys',
+    no_keys: 'No keys',
+    key_col: 'Key',
+    label_col: 'Label',
+    status_col: 'Status',
+    status_ok: 'Alive',
+    status_unknown: 'Untested',
+    active: 'Active',
+    disabled: 'Disabled',
+    dead_col: 'Dead',
+    pool_keys: 'Key Pool',
+    check_all: 'Check All',
+    tab_paste: 'Paste',
+    tab_file: 'File',
+    file_select: 'Select .txt file',
+    drag_hint: 'Drop .txt file here',
+    l_title: 'Request Logs',
+    all_models: 'All Models',
+    all_status: 'All Status',
+    refresh: 'Refresh',
+    no_logs: 'No logs',
+    time_col: 'Time',
+    model_col: 'Model',
+    channel_col: 'Channel',
+    status_col2: 'Status',
+    ttft_col: 'TTFT',
+    latency_col: 'Total',
+    ip_col: 'IP',
+    c_title: 'Channels',
+    st_requests: 'Requests',
+    st_alive: 'Alive',
+    st_dead: 'Dead',
+    models_label: 'Models',
+  }
+};
+
+let _lang = localStorage.getItem('prem2api_lang') || 'zh';
+
+function t(key) {
+  return I18N[_lang][key] || key;
+}
+
+function applyLang() {
+  document.querySelectorAll('[data-i18n]').forEach(el => {
+    const key = el.getAttribute('data-i18n');
+    if (I18N[_lang][key]) {
+      // preserve icon HTML
+      const icon = el.querySelector('i');
+      el.childNodes.forEach((n, i) => {
+        if (n.nodeType === 3) { n.textContent = ' ' + t(key); }
+      });
+      if (!icon) el.textContent = t(key);
+    }
+  });
+  document.getElementById('langBtn').textContent = _lang === 'zh' ? 'EN' : '中';
+  document.documentElement.lang = _lang === 'zh' ? 'zh-CN' : 'en';
+}
+
+function toggleLang() {
+  _lang = _lang === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('prem2api_lang', _lang);
+  applyLang();
+  // re-render dynamic content
+  if (window.renderDynamic) window.renderDynamic();
+}
+
+applyLang();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

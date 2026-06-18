@@ -1,0 +1,12 @@
+__pycache__
+*.pyc
+*.pyo
+*.db*
+channels.json
+prem_api_keys.txt
+prem_api_keys.txt.dead
+config.json
+keys/
+accounts/
+.env
+.DS_Store

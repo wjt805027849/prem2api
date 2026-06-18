@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Channels{% endblock %}
+{% block heading %}<span data-i18n="c_title">Channels</span>{% endblock %}
+{% block content %}
+
+<div class="row g-3" id="channelCards"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function renderDynamic() {
+  fetch('/api/channels').then(r=>r.json()).then(d => {
+    document.getElementById('channelCards').innerHTML = d.channels.map(ch => `
+      <div class="col-md-6">
+        <div class="card stat-card">
+          <div class="card-body">
+            <h6 class="fw-bold"><i class="bi bi-hdd-stack"></i> ${ch.name}</h6>
+            <div class="row mt-3">
+              <div class="col-4 text-center">
+                <div class="stat-value text-success">${ch.alive}</div>
+                <small class="text-muted" data-i18n="alive">Alive</small>
+              </div>
+              <div class="col-4 text-center">
+                <div class="stat-value text-secondary">${ch.dead}</div>
+                <small class="text-muted" data-i18n="st_dead">Dead</small>
+              </div>
+              <div class="col-4 text-center">
+                <div class="stat-value">${ch.total}</div>
+                <small class="text-muted" data-i18n="total">Total</small>
+              </div>
+            </div>
+            <div class="progress mt-3" style="height:10px">
+              <div class="progress-bar bg-success" style="width:${ch.total?(ch.alive/ch.total*100):0}%"></div>
+              <div class="progress-bar bg-danger" style="width:${ch.total?(ch.dead/ch.total*100):0}%"></div>
+            </div>
+            <div class="mt-3">
+              <small class="text-muted" data-i18n="models_label">Models:</small>
+              <div>${ch.models.map(m => `<span class="badge bg-light text-dark me-1">${m}</span>`).join('')}</div>
+            </div>
+            <div class="mt-2"><small class="text-muted">${ch.base_url}</small></div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+    applyLang();
+  });
+}
+
+window.renderDynamic = renderDynamic;
+renderDynamic();
+setInterval(renderDynamic, 15000);
+</script>
+{% endblock %}

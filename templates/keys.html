@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+{% block title %}Key Management{% endblock %}
+{% block heading %}<span data-i18n="k_title">Key Management</span>{% endblock %}
+{% block content %}
+
+<!-- Pool Stats -->
+<div class="row g-3 mb-4" id="poolStats"></div>
+
+<div class="row g-3 mb-4">
+  <!-- Import -->
+  <div class="col-md-5">
+    <div class="table-container">
+      <h6 class="fw-bold mb-3"><i class="bi bi-upload"></i> <span data-i18n="import_keys">Import Keys</span></h6>
+
+      <ul class="nav nav-tabs mb-3" style="font-size:.85rem">
+        <li class="nav-item"><a class="nav-link active" id="tabPaste" href="#" onclick="switchImport('paste')" data-i18n="tab_paste">Paste</a></li>
+        <li class="nav-item"><a class="nav-link" id="tabFile" href="#" onclick="switchImport('file')" data-i18n="tab_file">File</a></li>
+      </ul>
+
+      <!-- Paste tab -->
+      <div id="importPaste">
+        <div class="mb-3">
+          <label class="form-label" data-i18n="paste_keys">Paste keys (one per line)</label>
+          <textarea class="form-control" id="keyInput" rows="6" placeholder="sk_live_..."></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="poolAdd()"><i class="bi bi-upload"></i> <span data-i18n="import_btn">Import</span></button>
+        <span id="importResult" class="ms-2"></span>
+      </div>
+
+      <!-- File tab -->
+      <div id="importFile" style="display:none">
+        <div class="mb-3">
+          <label class="form-label" data-i18n="file_select">Select .txt key file</label>
+          <input type="file" class="form-control" id="fileInput" accept=".txt" onchange="poolUpload()">
+        </div>
+        <div id="fileDropZone" class="border border-2 border-dashed rounded p-4 text-center text-muted" style="cursor:pointer;border-style:dashed!important" ondragover="event.preventDefault()" ondrop="handleDrop(event)">
+          <i class="bi bi-cloud-upload fs-3 d-block mb-2"></i>
+          <span data-i18n="drag_hint">Drop .txt file here</span>
+        </div>
+        <div class="mt-2" id="fileStatus"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Key List -->
+  <div class="col-md-7">
+    <div class="table-container">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h6 class="fw-bold mb-0"><i class="bi bi-key"></i> <span data-i18n="pool_keys">Pool Keys</span></h6>
+        <div>
+          <input class="form-control form-control-sm d-inline w-auto" id="searchInput" placeholder="search..." oninput="renderDynamic()">
+        </div>
+      </div>
+      <div id="keyList"></div>
+      <div class="d-flex justify-content-between align-items-center mt-3">
+        <div>
+          <button class="btn btn-sm btn-outline-secondary me-1" id="poolPrevBtn" onclick="poolPrev()"><i class="bi bi-chevron-left"></i></button>
+          <small class="text-muted" id="poolPageInfo"></small>
+          <button class="btn btn-sm btn-outline-secondary ms-1" id="poolNextBtn" onclick="poolNext()"><i class="bi bi-chevron-right"></i></button>
+        </div>
+        <div>
+          <button class="btn btn-sm btn-outline-danger" onclick="poolCheckAll()"><i class="bi bi-shield-check"></i> <span data-i18n="check_all">Check All</span></button>
+          <button class="btn btn-sm btn-outline-primary ms-1" onclick="renderDynamic()"><i class="bi bi-arrow-clockwise"></i></button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let poolPage = 0;
+const POOL_PAGE_SIZE = 50;
+let poolTotal = 0;
+
+function renderDynamic() {
+  const search = document.getElementById('searchInput').value;
+  fetch(`/api/pool?offset=${poolPage * POOL_PAGE_SIZE}&limit=${POOL_PAGE_SIZE}&search=${encodeURIComponent(search)}`)
+    .then(r => r.json()).then(d => {
+      poolTotal = d.total;
+      const stats = [
+        {label: t('total'), value: d.total, icon:'bi-key', color:'primary'},
+        {label: t('alive'), value: d.alive, icon:'bi-check-circle', color:'success'},
+        {label: t('dead_col'), value: d.dead, icon:'bi-x-circle', color:'danger'},
+      ];
+      document.getElementById('poolStats').innerHTML = stats.map(s => `
+        <div class="col-md-4">
+          <div class="card stat-card">
+            <div class="card-body">
+              <div class="stat-value text-${s.color}">${s.value}</div>
+              <div class="stat-label"><i class="bi ${s.icon}"></i> ${s.label}</div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      document.getElementById('poolPageInfo').textContent = poolTotal ? `${poolPage * POOL_PAGE_SIZE + 1}-${Math.min((poolPage+1)*POOL_PAGE_SIZE, poolTotal)} / ${poolTotal}` : '0';
+      document.getElementById('poolPrevBtn').disabled = poolPage === 0;
+      document.getElementById('poolNextBtn').disabled = (poolPage+1)*POOL_PAGE_SIZE >= poolTotal;
+
+      const el = document.getElementById('keyList');
+      if (!d.keys.length) { el.innerHTML = `<p class="text-muted my-4 text-center">${t('no_keys')}</p>`; return; }
+      el.innerHTML = `<table class="table table-sm"><thead><tr>
+        <th style="width:40px">#</th><th data-i18n="key_col">Key</th><th style="width:100px" data-i18n="status_col">Status</th><th style="width:80px"></th>
+      </tr></thead><tbody>
+        ${d.keys.map((k, i) => `
+          <tr>
+            <td><small class="text-muted">${k.index}</small></td>
+            <td><code style="font-size:.75rem">${k.key}</code></td>
+            <td><span class="badge bg-secondary" id="status-${k.index}">-</span></td>
+            <td>
+              <button class="btn btn-sm btn-outline-info" onclick="poolCheckOne('${k.key_full}')" title="Check"><i class="bi bi-shield-check"></i></button>
+              <button class="btn btn-sm btn-outline-danger" onclick="poolRemove('${k.key_full}')" title="Remove"><i class="bi bi-trash"></i></button>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody></table>`;
+      applyLang();
+    });
+}
+
+function poolPrev() { if (poolPage > 0) { poolPage--; renderDynamic(); } }
+function poolNext() { poolPage++; renderDynamic(); }
+
+function switchImport(tab) {
+  document.getElementById('importPaste').style.display = tab === 'paste' ? '' : 'none';
+  document.getElementById('importFile').style.display = tab === 'file' ? '' : 'none';
+  document.getElementById('tabPaste').classList.toggle('active', tab === 'paste');
+  document.getElementById('tabFile').classList.toggle('active', tab === 'file');
+}
+
+function poolAdd() {
+  const raw = document.getElementById('keyInput').value;
+  fetch('/api/pool/add', {method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({keys: raw})})
+    .then(r => r.json()).then(d => {
+      document.getElementById('importResult').innerHTML = `<span class="text-success">+${d.added} keys</span>`;
+      if (d.added) { document.getElementById('keyInput').value = ''; renderDynamic(); }
+    });
+}
+
+function poolUpload() {
+  const file = document.getElementById('fileInput').files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append('file', file);
+  document.getElementById('fileStatus').innerHTML = '<span class="text-info">Uploading...</span>';
+  fetch('/api/pool/upload', {method:'POST', body: form})
+    .then(r => r.json()).then(d => {
+      document.getElementById('fileStatus').innerHTML = `<span class="text-success">+${d.added} keys</span>`;
+      if (d.added) renderDynamic();
+    }).catch(e => {
+      document.getElementById('fileStatus').innerHTML = `<span class="text-danger">Error: ${e}</span>`;
+    });
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  document.getElementById('fileInput').files = e.dataTransfer.files;
+  poolUpload();
+}
+
+function poolRemove(fullKey) {
+  if (!confirm('Remove this key?')) return;
+  fetch('/api/pool/remove', {method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({key: fullKey})})
+    .then(r => r.json()).then(() => renderDynamic());
+}
+
+function poolCheckOne(fullKey) {
+  fetch('/api/pool/check', {method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({key: fullKey})})
+    .then(r => r.json()).then(d => {
+      renderDynamic();
+    });
+}
+
+function poolCheckAll() {
+  const btn = event.target;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  fetch('/api/pool?limit=500')
+    .then(r => r.json())
+    .then(d => {
+      const keys = d.keys;
+      let i = 0;
+      function next() {
+        if (i >= keys.length) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-shield-check"></i> Check All'; renderDynamic(); return; }
+        const k = keys[i]; i++;
+        fetch('/api/pool/check', {method:'POST', headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({key: k.key_full})})
+          .then(r => r.json()).then(() => {
+            const st = document.getElementById('status-' + k.index);
+            if (st) st.textContent = 'OK';
+            setTimeout(next, 50);
+          }).catch(() => setTimeout(next, 50));
+      }
+      next();
+    });
+}
+
+window.renderDynamic = renderDynamic;
+renderDynamic();
+</script>
+{% endblock %}

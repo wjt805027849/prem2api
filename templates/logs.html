@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Request Logs{% endblock %}
+{% block heading %}<span data-i18n="l_title">Request Logs</span>{% endblock %}
+{% block content %}
+
+<div class="table-container">
+  <div class="d-flex justify-content-between mb-3">
+    <div>
+      <select class="form-select form-select-sm d-inline w-auto" id="filterModel" onchange="renderDynamic()">
+        <option value="" data-i18n="all_models">All Models</option>
+      </select>
+      <select class="form-select form-select-sm d-inline w-auto ms-2" id="filterStatus" onchange="renderDynamic()">
+        <option value="" data-i18n="all_status">All Status</option>
+        <option value="200">200</option>
+        <option value="400">400</option>
+        <option value="429">429</option>
+        <option value="500">500</option>
+      </select>
+    </div>
+    <button class="btn btn-sm btn-outline-primary" onclick="renderDynamic()"><i class="bi bi-arrow-clockwise"></i> <span data-i18n="refresh">Refresh</span></button>
+  </div>
+  <div id="logTable"></div>
+  <div class="d-flex justify-content-between align-items-center mt-3">
+    <div>
+      <button class="btn btn-sm btn-outline-secondary me-1" id="prevBtn" onclick="prevPage()"><i class="bi bi-chevron-left"></i></button>
+      <small class="text-muted" id="pageInfo"></small>
+      <button class="btn btn-sm btn-outline-secondary ms-1" id="nextBtn" onclick="nextPage()"><i class="bi bi-chevron-right"></i></button>
+    </div>
+    <small class="text-muted" id="logCount"></small>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentPage = 0;
+const PAGE_SIZE = 50;
+
+function renderDynamic() {
+  const model = document.getElementById('filterModel').value;
+  const status = document.getElementById('filterStatus').value;
+  let url = `/api/logs?limit=${PAGE_SIZE}&offset=${currentPage * PAGE_SIZE}`;
+  if (model) url += `&model=${model}`;
+  if (status) url += `&status=${status}`;
+
+  fetch(url).then(r=>r.json()).then(d => {
+    const count = d.logs.length;
+    document.getElementById('logCount').textContent = `${count} ${t('st_requests')}`;
+    const pageLabel = _lang === 'zh' ? '第' : 'Page ';
+    document.getElementById('pageInfo').textContent = `${pageLabel}${currentPage + 1}`;
+    document.getElementById('prevBtn').disabled = currentPage === 0;
+    document.getElementById('nextBtn').disabled = count < PAGE_SIZE;
+
+    const tbl = document.getElementById('logTable');
+    if (!count) { tbl.innerHTML = `<p class="text-muted my-4 text-center">${t('no_logs')}</p>`; return; }
+
+    const sel = document.getElementById('filterModel');
+    d.models.forEach(m => { if (!sel.querySelector(`option[value="${m}"]`)) { const o = document.createElement('option'); o.value=m; o.text=m; sel.appendChild(o); } });
+    applyLang();
+
+    tbl.innerHTML = `<table class="table table-sm"><thead><tr>
+      <th data-i18n="time_col">Time</th><th data-i18n="model_col">Model</th><th data-i18n="channel_col">Channel</th><th data-i18n="status_col2">Status</th><th data-i18n="ttft_col">TTFT</th><th data-i18n="latency_col">Total</th><th data-i18n="prompt_col">Prompt</th><th data-i18n="completion_col">Completion</th><th data-i18n="ip_col">IP</th>
+    </tr></thead><tbody>
+      ${d.logs.map(l => {
+        const time = new Date(l.timestamp*1000).toLocaleString();
+        const badge = l.status == 200 ? 'badge-200' : 'badge-'+l.status;
+        return `<tr><td><small>${time}</small></td>
+          <td><code>${l.model}</code></td>
+          <td>${l.channel}</td>
+          <td><span class="badge ${badge}">${l.status}</span></td>
+          <td><small>${l.ttft_ms||'-'}ms</small></td>
+          <td><small>${l.latency_ms}ms</small></td>
+          <td><small>${l.prompt_tokens||0}</small></td>
+          <td><small>${l.completion_tokens||0}</small></td>
+          <td><small>${l.client_ip}</small></td>
+        </tr>`;
+      }).join('')}
+    </tbody></table>`;
+    applyLang();
+  });
+}
+
+function prevPage() { if (currentPage > 0) { currentPage--; renderDynamic(); } }
+function nextPage() { currentPage++; renderDynamic(); }
+
+window.renderDynamic = renderDynamic;
+renderDynamic();
+setInterval(renderDynamic, 15000);
+</script>
+{% endblock %}

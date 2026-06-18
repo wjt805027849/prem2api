@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block heading %}<span data-i18n="d_title">Dashboard</span>{% endblock %}
+{% block content %}
+
+<div class="row g-3 mb-4" id="statCards"></div>
+
+<div class="row g-3 mb-4">
+  <div class="col-md-8">
+    <div class="table-container">
+      <h6 class="fw-bold mb-3"><i class="bi bi-bar-chart"></i> <span data-i18n="token_chart">Token Usage (last 24h)</span></h6>
+      <canvas id="tokenChart" height="200"></canvas>
+    </div>
+  </div>
+  <div class="col-md-4">
+    <div class="table-container">
+      <h6 class="fw-bold mb-3"><i class="bi bi-pie-chart"></i> <span data-i18n="by_model">By Model</span></h6>
+      <div id="modelStats"></div>
+    </div>
+  </div>
+</div>
+
+<div class="table-container">
+  <h6 class="fw-bold mb-3"><i class="bi bi-diagram-3"></i> <span data-i18n="channel_health">Channel Health</span></h6>
+  <div id="channelHealth"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function renderDynamic() {
+  fetch('/api/stats?hours=24')
+    .then(r => r.json())
+    .then(d => {
+      const s = d.summary;
+      const total_tokens = (s.total_prompt||0) + (s.total_completion||0);
+      const cards = [
+        {label: t('total_requests'), value: s.total_requests, icon:'bi-arrow-repeat', color:'primary'},
+        {label: t('success'), value: s.success, icon:'bi-check-circle', color:'success'},
+        {label: t('failed'), value: s.failed, icon:'bi-x-circle', color:'danger'},
+        {label: t('avg_ttft'), value: (s.avg_ttft|0)+'ms', icon:'bi-clock-history', color:'info'},
+        {label: t('avg_latency'), value: (s.avg_latency|0)+'ms', icon:'bi-clock', color:'secondary'},
+        {label: t('prompt_tokens'), value: s.total_prompt, icon:'bi-input-cursor', color:'warning'},
+        {label: t('completion_tokens'), value: s.total_completion, icon:'bi-chat-dots', color:'info'},
+      ];
+      document.getElementById('statCards').innerHTML = cards.map(c => `
+        <div class="col-md-4 col-lg-2">
+          <div class="card stat-card">
+            <div class="card-body">
+              <div class="stat-value text-${c.color}">${c.value}</div>
+              <div class="stat-label"><i class="bi ${c.icon}"></i> ${c.label}</div>
+            </div>
+          </div>
+        </div>
+      `).join('');
+
+      const tl = d.timeline;
+      if (window._chart) window._chart.destroy();
+      window._chart = new Chart(document.getElementById('tokenChart'), {
+        type: 'bar',
+        data: {
+          labels: tl.map(t => new Date(t.time*1000).toLocaleTimeString()),
+          datasets: [
+            {label: t('st_requests'), data: tl.map(t=>t.reqs), backgroundColor:'#6366f1', borderRadius:4},
+            {label: t('prompt_tokens'), data: tl.map(t=>t.tokens), backgroundColor:'#a5b4fc', borderRadius:4},
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {legend:{display:true, position:'top'}},
+          scales: {y:{beginAtZero:true, grid:{color:'#f0f0f0'}}}
+        }
+      });
+
+      const ms = document.getElementById('modelStats');
+      if (!d.by_model.length) { ms.innerHTML = `<p class="text-muted">${t('no_data')}</p>`; return; }
+      ms.innerHTML = d.by_model.map(m => `
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <small>${m.model}</small>
+          <span class="badge bg-light text-dark">${m.reqs} ${t('st_requests')}</span>
+        </div>
+        <div class="progress mb-3" style="height:6px">
+          <div class="progress-bar bg-primary" style="width:${Math.min(100, m.reqs/(d.by_model[0]?.reqs||1)*100)}%"></div>
+        </div>
+      `).join('');
+
+      fetch('/api/channels').then(r=>r.json()).then(cd => {
+        document.getElementById('channelHealth').innerHTML = cd.channels.map(ch => `
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <span><strong>${ch.name}</strong></span>
+            <span>
+              <span class="badge bg-success">${ch.alive} ${t('alive')}</span>
+              <span class="badge bg-secondary">${ch.total} ${t('total')}</span>
+            </span>
+          </div>
+          <div class="progress mb-3" style="height:8px">
+            <div class="progress-bar bg-success" style="width:${ch.total?(ch.alive/ch.total*100):0}%"></div>
+          </div>
+        `).join('');
+      });
+    });
+}
+
+window.renderDynamic = renderDynamic;
+renderDynamic();
+setInterval(renderDynamic, 10000);
+</script>
+{% endblock %}
