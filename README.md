@@ -111,31 +111,6 @@ response = client.chat.completions.create(
 | `/api/reload` | POST | 热加载 keys 文件 |
 | `/api/pool` | GET/POST | Key 池管理 API |
 
-## 多通道示例
-
-如需同时接入 Prem 和其他提供商:
-
-```json
-{
-  "channels": [
-    {
-      "name": "prem",
-      "baseURL": "http://127.0.0.1:3100/openai/v1",
-      "keysFile": "prem_api_keys.txt",
-      "models": ["deepseek-v4-pro", "qwen35-27b", "qwen36-27b"]
-    },
-    {
-      "name": "axiom",
-      "baseURL": "https://axiomcode.top/v1",
-      "keys": ["sk-your-axiom-key"],
-      "models": ["deepseek-v4-flash"]
-    }
-  ]
-}
-```
-
-请求时根据 `model` 字段自动路由到对应通道。
-
 ## 与 OpenCode 集成
 
 在 `opencode.json` 中添加:
