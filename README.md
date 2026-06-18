@@ -46,7 +46,7 @@ pip install -r requirements.txt
     {
       "name": "prem",
       "baseURL": "http://127.0.0.1:3100/openai/v1",
-      "keysFile": "../premtool/prem_api_keys.txt",
+      "keysFile": "prem_api_keys.txt",
       "models": ["deepseek-v4-pro", "qwen35-27b", "qwen36-27b"]
     }
   ]
@@ -57,11 +57,9 @@ pip install -r requirements.txt
 
 ```bash
 # 启动 pcci-proxy (Prem 加密代理)
-cd ../premtool
 npx confidential-proxy --api-key YOUR_KEY
 
 # 启动 prem2api
-cd ../prem2api
 python prem2api.py
 
 # 或双击 run.bat (Windows)
@@ -109,7 +107,9 @@ response = client.chat.completions.create(
 | `/v1/models` | GET | 模型列表 |
 | `/v1/chat/completions` | POST | 聊天补全(支持 stream) |
 | `/health` | GET | 健康检查 + 通道状态 |
-| `/admin/channels` | GET | 各通道 key 存活详情(需 apiKey) |
+| `/admin` | GET | 管理后台 UI |
+| `/api/reload` | POST | 热加载 keys 文件 |
+| `/api/pool` | GET/POST | Key 池管理 API |
 
 ## 多通道示例
 
@@ -121,7 +121,7 @@ response = client.chat.completions.create(
     {
       "name": "prem",
       "baseURL": "http://127.0.0.1:3100/openai/v1",
-      "keysFile": "../premtool/prem_api_keys.txt",
+      "keysFile": "prem_api_keys.txt",
       "models": ["deepseek-v4-pro", "qwen35-27b", "qwen36-27b"]
     },
     {
@@ -154,14 +154,6 @@ response = client.chat.completions.create(
   }
 }
 ```
-
-## 注册新账户
-
-```bash
-python ../premtool/prem_register_fast.py --loop
-```
-
-新账户的 key 自动追加到 keys 文件,重启 prem2api 即可生效(发送 SIGHUP 也可热加载)。
 
 ## License
 
